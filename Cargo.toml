@@ -7,16 +7,19 @@ edition = "2021"
 name = "app_timer2"
 path = "src/lib.rs"
 
+[[bin]]
+name = "visualize-app-timer2"
+
 [dependencies]
 anyhow = "1.0.66"
 chrono = "0.4.23"
 ctrlc = { version = "3.2.3", features = ["termination"] }
-focus_monitor = { path = "../../projects/focus_monitor", features = ["tokio"] }
+focus_monitor = { version = "0.1.3", features = ["tokio"] }
 humantime = "2.1.0"
 log = "0.4.17"
 log4rs = "1.2.0"
 pretty_env_logger = "0.4.0"
-prettytable-rs = "0.9.0"
+prettytable-rs = "0.10.0"
 sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "sqlite"] }
 tokio = { version = "1.22.0", features = ["full"] }
 xcb = "1.2.0"
