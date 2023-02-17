@@ -24,27 +24,47 @@ pub async fn save_windows(pool: &SqlitePool, windows: &[Window]) -> anyhow::Resu
         return Ok(());
     }
 
-    let mut transaction = pool.begin().await?;
+    let mut to_save = Vec::new();
 
     for window in windows {
         let datetime = window.datetime.to_rfc3339();
         let duration = window.duration.as_secs_f64();
-        sqlx::query!(
-            r#"
-                INSERT INTO windows_log (datetime, class_left, class_right, title, duration)
-                VALUES (?1, ?2, ?3, ?4, ?5)
-            "#,
+        to_save.push((
             datetime,
-            window.class.0,
-            window.class.1,
-            window.title,
-            duration
-        )
-        .execute(&mut transaction)
-        .await?;
+            &window.class.0,
+            &window.class.1,
+            &window.title,
+            duration,
+        ));
     }
 
-    transaction.commit().await?;
+    let mut query = String::from(
+        "INSERT INTO windows_log (datetime, class_left, class_right, title, duration) VALUES",
+    );
+
+    for (index, _) in to_save.iter().enumerate() {
+        let x = index * 5;
+        query += &format!(
+            "\n(?{}, ?{}, ?{}, ?{}, ?{})",
+            x + 1,
+            x + 2,
+            x + 3,
+            x + 4,
+            x + 5
+        );
+        query += if index == to_save.len() - 1 { ";" } else { "," }
+    }
+
+    let mut query = sqlx::query(&query);
+    for window in to_save {
+        query = query
+            .bind(window.0)
+            .bind(window.1)
+            .bind(window.2)
+            .bind(window.3)
+            .bind(window.4)
+    }
+    query.execute(pool).await?;
 
     Ok(())
 }

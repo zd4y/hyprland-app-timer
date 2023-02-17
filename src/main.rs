@@ -61,7 +61,8 @@ async fn run(pool: &SqlitePool, rx: &mut Receiver<()>) -> anyhow::Result<()> {
                 now = Instant::now();
                 last_window = new_last_window;
 
-                if records.len() >= 1000 {
+                log::info!("records.len()={}", records.len());
+                if records.len() >= 100 {
                     save_windows(pool, &mut records).await?;
                 }
             }
