@@ -28,6 +28,10 @@ async fn main() -> anyhow::Result<()> {
             }
         },
         None => {
+            if app_timer2::send_save_signal().await.is_ok() {
+                bail!("already running")
+            }
+
             let (tx, mut rx) = mpsc::channel(100);
 
             let tx2 = tx.clone();
