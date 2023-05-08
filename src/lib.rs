@@ -1,8 +1,11 @@
-use std::{env, time::Duration};
+use std::{env, str::FromStr, time::Duration};
 
 use chrono::{DateTime, TimeZone, Utc};
 pub use sqlx::SqlitePool;
-use sqlx::{sqlite::SqliteRow, FromRow, Row};
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqliteRow},
+    ConnectOptions, FromRow, Row,
+};
 
 use ipc_channel::ipc::IpcSender;
 use serde::{Deserialize, Serialize};
@@ -29,7 +32,9 @@ pub struct AppDay {
 
 pub async fn get_pool() -> anyhow::Result<SqlitePool> {
     let database_url = env::var("DATABASE_URL")?;
-    let pool = SqlitePool::connect(&database_url).await?;
+    let mut options = SqliteConnectOptions::from_str(&database_url)?;
+    options.disable_statement_logging();
+    let pool = SqlitePool::connect_with(options).await?;
     log::info!("Connected to sqlite pool {}", database_url);
     sqlx::migrate!("./migrations").run(&pool).await?;
     Ok(pool)

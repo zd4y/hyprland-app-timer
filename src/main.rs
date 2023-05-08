@@ -125,22 +125,21 @@ async fn run_server(pool: &SqlitePool, rx: &mut Receiver<Message>) -> anyhow::Re
                 let duration = now.elapsed();
                 now = Instant::now();
 
-                log::info!("received window");
-                log::info!("window={:#?}", new_last_window);
-                log::info!("{:?} ({:?})", last_window, duration);
+                log::info!("received window: {:?} ||| last_window: {:?} ({:?})", new_last_window, last_window, duration);
 
                 if let Some(window) = last_window.take() {
                     records.push(new_window(window, duration));
                 }
                 last_window = new_last_window;
 
-                log::info!("records.len()={}", records.len());
                 if records.len() >= 100 {
                     save_windows(pool, &mut records).await?;
                 }
             }
         }
     }
+
+    drop(focus_monitor);
 
     // Add the latest window
     if let Some(window) = last_window {
