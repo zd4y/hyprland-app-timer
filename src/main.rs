@@ -4,6 +4,7 @@ use chrono::Utc;
 use hyprland::event_listener::{EventListener, WindowEventData};
 use ipc_channel::ipc::IpcOneShotServer;
 use sqlx::SqlitePool;
+use std::sync::Arc;
 use std::time::Instant;
 use std::{env, thread};
 use tokio::sync::mpsc::{self, Receiver, Sender};
@@ -93,10 +94,18 @@ async fn run(tx: Sender<Message>, rx: &mut Receiver<Message>) -> anyhow::Result<
 
 async fn run_server(pool: &SqlitePool, rx: &mut Receiver<Message>) -> anyhow::Result<()> {
     let (windows_sender, mut windows_receiver) = mpsc::channel(100);
+    let windows_sender = Arc::new(windows_sender);
+    let windows_sender2 = Arc::clone(&windows_sender);
+
     let mut event_listener = EventListener::new();
     event_listener.add_active_window_change_handler(move |data| {
         windows_sender
             .blocking_send(data)
+            .expect("failed sending window");
+    });
+    event_listener.add_window_close_handler(move |_| {
+        windows_sender2
+            .blocking_send(None)
             .expect("failed sending window");
     });
     thread::spawn(move || {
