@@ -18,7 +18,7 @@ tokio = { version = "1.22.0", features = ["full"] }
 
 ctrlc = { version = "3.2.3", features = ["termination"], optional = true }
 log-panics = { version = "2.1.0", optional = true }
-hyprland = { version = "0.3.7", optional = true }
+hyprland = { git = "https://github.com/hyprland-community/hyprland-rs", branch = "master", optional = true }
 log4rs = { version = "1.2.0", optional = true }
 xcb = { version = "1.2.0", optional = true }
 
