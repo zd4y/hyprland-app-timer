@@ -18,10 +18,10 @@ tokio = { version = "1.22.0", features = ["full"] }
 
 ctrlc = { version = "3.2.3", features = ["termination"], optional = true }
 log-panics = { version = "2.1.0", optional = true }
-focus_monitor = { version = "0.1.3", features = ["tokio"], optional = true }
+hyprland = { version = "0.3.7", optional = true }
 log4rs = { version = "1.2.0", optional = true }
 xcb = { version = "1.2.0", optional = true }
 
 [features]
 default = ["server"]
-server = ["dep:focus_monitor", "dep:log4rs", "dep:xcb", "dep:log-panics", "dep:ctrlc"]
+server = ["dep:hyprland", "dep:log4rs", "dep:xcb", "dep:log-panics", "dep:ctrlc"]
