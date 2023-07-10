@@ -1,5 +1,5 @@
 use anyhow::bail;
-use app_timer2::Message;
+use app_timer2::{send_stop_signal_blocking, Message};
 use chrono::Utc;
 use hyprland::event_listener::{EventListener, WindowEventData};
 use ipc_channel::ipc::IpcOneShotServer;
@@ -7,7 +7,7 @@ use sqlx::SqlitePool;
 use std::sync::Arc;
 use std::time::Instant;
 use std::{env, thread};
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::mpsc::{self, Receiver};
 use tokio::time::interval_at;
 
 use log::LevelFilter;
@@ -52,13 +52,12 @@ async fn main() -> anyhow::Result<()> {
                             tx2.blocking_send(Message::Stop)?;
                             break;
                         }
-                        Message::StopSendingSignal => unreachable!(),
                     };
                 }
                 Ok::<(), anyhow::Error>(())
             });
 
-            run(tx, &mut rx).await?;
+            run(&mut rx).await?;
 
             handle.join().expect("failed joining thread handle")?;
 
@@ -67,13 +66,11 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-async fn run(tx: Sender<Message>, rx: &mut Receiver<Message>) -> anyhow::Result<()> {
+async fn run(rx: &mut Receiver<Message>) -> anyhow::Result<()> {
     ctrlc::set_handler(move || {
         log::info!("in ctrlc handler, sending signal...");
-        tx.blocking_send(Message::StopSendingSignal)
-            .expect("Error sending signal to channel")
-    })
-    .expect("Error setting Ctrl-C handler");
+        send_stop_signal_blocking().expect("Error sending stop signal")
+    })?;
 
     let logfile = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new("<{d} {l}> - {m}\n")))
@@ -128,10 +125,6 @@ async fn run_server(pool: &SqlitePool, rx: &mut Receiver<Message>) -> anyhow::Re
             biased;
 
             Some(signal) = rx.recv() => match signal {
-                Message::StopSendingSignal => {
-                    app_timer2::send_stop_signal().await?;
-                    break;
-                },
                 Message::Stop => break,
                 Message::Save => {
                     save_windows(pool, &mut records).await?;

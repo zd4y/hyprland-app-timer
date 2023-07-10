@@ -209,7 +209,6 @@ impl FromRow<'_, SqliteRow> for AppDay {
 pub enum Message {
     Save,
     Stop,
-    StopSendingSignal,
 }
 
 async fn send_signal(msg: Message) -> anyhow::Result<()> {
@@ -219,8 +218,19 @@ async fn send_signal(msg: Message) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn send_signal_blocking(msg: Message) -> anyhow::Result<()> {
+    let server_name = std::fs::read_to_string(env::var("SERVER_URL_FILE")?)?;
+    let tx = IpcSender::connect(server_name)?;
+    tx.send(msg)?;
+    Ok(())
+}
+
 pub async fn send_stop_signal() -> anyhow::Result<()> {
     send_signal(Message::Stop).await
+}
+
+pub fn send_stop_signal_blocking() -> anyhow::Result<()> {
+    send_signal_blocking(Message::Stop)
 }
 
 pub async fn send_save_signal() -> anyhow::Result<()> {
