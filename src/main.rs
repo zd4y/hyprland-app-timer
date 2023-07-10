@@ -4,6 +4,7 @@ use chrono::Utc;
 use hyprland::event_listener::{EventListener, WindowEventData};
 use ipc_channel::ipc::IpcOneShotServer;
 use sqlx::SqlitePool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use std::{env, thread};
@@ -68,9 +69,12 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn run(rx: &mut Receiver<Message>) -> anyhow::Result<()> {
+    let ctrlc_handled = AtomicBool::new(false);
     ctrlc::set_handler(move || {
-        log::info!("in ctrlc handler, sending signal...");
-        send_stop_signal_blocking().expect("Error sending stop signal")
+        if !ctrlc_handled.swap(true, Ordering::SeqCst) {
+            log::info!("in ctrlc handler, sending signal...");
+            send_stop_signal_blocking().expect("Error sending stop signal")
+        }
     })?;
 
     let logfile = FileAppender::builder()
