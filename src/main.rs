@@ -29,6 +29,7 @@ async fn main() -> anyhow::Result<()> {
             }
         },
         None => {
+            // TODO: Consider using a new signal (maybe ping)
             if app_timer2::send_save_signal().await.is_ok() {
                 bail!("already running")
             }
