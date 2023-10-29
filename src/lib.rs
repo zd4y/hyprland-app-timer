@@ -40,7 +40,7 @@ pub enum Message {
 
 pub async fn get_pool() -> anyhow::Result<SqlitePool> {
     let database_url = get_database_url()?;
-    let mut options = SqliteConnectOptions::from_str(&database_url)?;
+    let mut options = SqliteConnectOptions::from_str(&database_url)?.create_if_missing(true);
     options.disable_statement_logging();
     let pool = SqlitePool::connect_with(options).await?;
     log::debug!("Connected to sqlite pool {}", database_url);
