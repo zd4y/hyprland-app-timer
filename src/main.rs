@@ -1,5 +1,5 @@
 use anyhow::bail;
-use app_timer2::{send_stop_signal_blocking, Message};
+use hyprland_app_timer::{send_stop_signal_blocking, Message};
 use chrono::Utc;
 use hyprland::event_listener::{EventListener, WindowEventData};
 use ipc_channel::ipc::IpcOneShotServer;
@@ -18,15 +18,15 @@ async fn main() -> anyhow::Result<()> {
 
     match args.next() {
         Some(arg) => match arg.as_str() {
-            "stop" => app_timer2::send_stop_signal().await,
-            "save" => app_timer2::send_save_signal().await,
+            "stop" => hyprland_app_timer::send_stop_signal().await,
+            "save" => hyprland_app_timer::send_save_signal().await,
             _ => {
                 bail!("unknown argument received: {arg}")
             }
         },
         None => {
             // TODO: Consider using a new signal (maybe ping)
-            if app_timer2::send_save_signal().await.is_ok() {
+            if hyprland_app_timer::send_save_signal().await.is_ok() {
                 bail!("already running")
             }
 
@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
             let handle = thread::spawn(move || {
                 loop {
                     let (server, server_name) = IpcOneShotServer::<Message>::new()?;
-                    app_timer2::set_server_name_blocking(&server_name)?;
+                    hyprland_app_timer::set_server_name_blocking(&server_name)?;
                     let message = server.accept()?.1;
                     match message {
                         Message::Save => {
@@ -71,7 +71,7 @@ async fn run(rx: &mut Receiver<Message>) -> anyhow::Result<()> {
 
     env_logger::init();
 
-    let pool = app_timer2::get_pool().await?;
+    let pool = hyprland_app_timer::get_pool().await?;
     run_server(&pool, rx).await?;
 
     Ok(())
@@ -156,9 +156,9 @@ async fn run_server(pool: &SqlitePool, rx: &mut Receiver<Message>) -> anyhow::Re
 
 async fn save_windows(
     pool: &SqlitePool,
-    windows: &mut Vec<app_timer2::Window>,
+    windows: &mut Vec<hyprland_app_timer::Window>,
 ) -> anyhow::Result<()> {
-    app_timer2::save_windows(pool, windows).await?;
+    hyprland_app_timer::save_windows(pool, windows).await?;
     log::debug!("windows saved: {:?}", windows);
     windows.clear();
     Ok(())
@@ -167,8 +167,8 @@ async fn save_windows(
 fn new_window(
     window_event_data: WindowEventData,
     duration: std::time::Duration,
-) -> app_timer2::Window {
-    app_timer2::Window {
+) -> hyprland_app_timer::Window {
+    hyprland_app_timer::Window {
         datetime: Utc::now() - chrono::Duration::from_std(duration).unwrap(),
         title: window_event_data.window_title,
         class: (
