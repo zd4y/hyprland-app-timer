@@ -36,10 +36,7 @@ async fn main() -> anyhow::Result<()> {
             let handle = thread::spawn(move || {
                 loop {
                     let (server, server_name) = IpcOneShotServer::<Message>::new()?;
-                    {
-                        let server_url_file = env::var("SERVER_URL_FILE")?;
-                        std::fs::write(server_url_file, server_name)?;
-                    }
+                    app_timer2::set_server_name_blocking(&server_name)?;
                     let message = server.accept()?.1;
                     match message {
                         Message::Save => {

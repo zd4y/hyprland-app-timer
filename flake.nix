@@ -42,9 +42,6 @@
               sqlx-cli
               toolchain
             ]);
-
-            DATABASE_URL = "sqlite:" + builtins.getEnv "HOME" + "/app_timer2.db";
-            SERVER_URL_FILE = builtins.getEnv "HOME" + "/app-timer2-server.txt";
           };
       });
 }

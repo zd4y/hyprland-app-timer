@@ -1,5 +1,6 @@
-use std::{env, str::FromStr, time::Duration};
+use std::{str::FromStr, time::Duration};
 
+use anyhow::Context;
 use chrono::{DateTime, TimeZone, Utc};
 pub use sqlx::SqlitePool;
 use sqlx::{
@@ -9,6 +10,7 @@ use sqlx::{
 
 use ipc_channel::ipc::IpcSender;
 use serde::{Deserialize, Serialize};
+use xdg::BaseDirectories;
 
 #[derive(Debug)]
 pub struct Window {
@@ -37,7 +39,7 @@ pub enum Message {
 }
 
 pub async fn get_pool() -> anyhow::Result<SqlitePool> {
-    let database_url = env::var("DATABASE_URL")?;
+    let database_url = get_database_url()?;
     let mut options = SqliteConnectOptions::from_str(&database_url)?;
     options.disable_statement_logging();
     let pool = SqlitePool::connect_with(options).await?;
@@ -189,6 +191,12 @@ pub async fn send_save_signal() -> anyhow::Result<()> {
     send_signal(Message::Save).await
 }
 
+pub fn set_server_name_blocking(name: &str) -> anyhow::Result<()> {
+    let server_name_file = get_xdg_dirs()?.place_data_file("server.txt")?;
+    std::fs::write(server_name_file, name)?;
+    Ok(())
+}
+
 impl FromRow<'_, SqliteRow> for Window {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
         let datetime = row.try_get("datetime")?;
@@ -224,15 +232,35 @@ impl FromRow<'_, SqliteRow> for AppDay {
 }
 
 async fn send_signal(msg: Message) -> anyhow::Result<()> {
-    let server_name = tokio::fs::read_to_string(env::var("SERVER_URL_FILE")?).await?;
+    let server_name = get_server_name().await?;
     let tx = IpcSender::connect(server_name)?;
     tx.send(msg)?;
     Ok(())
 }
 
 fn send_signal_blocking(msg: Message) -> anyhow::Result<()> {
-    let server_name = std::fs::read_to_string(env::var("SERVER_URL_FILE")?)?;
+    let server_name = get_server_name_blocking()?;
     let tx = IpcSender::connect(server_name)?;
     tx.send(msg)?;
     Ok(())
+}
+
+fn get_database_url() -> anyhow::Result<String> {
+    let path = get_xdg_dirs()?.place_data_file("apps.db")?;
+    let path_str = path.to_str().context("database path is not unicode")?;
+    Ok(format!("sqlite:{path_str}"))
+}
+
+async fn get_server_name() -> anyhow::Result<String> {
+    let server_name_file = get_xdg_dirs()?.place_data_file("server.txt")?;
+    Ok(tokio::fs::read_to_string(server_name_file).await?)
+}
+
+fn get_server_name_blocking() -> anyhow::Result<String> {
+    let server_name_file = get_xdg_dirs()?.place_data_file("server.txt")?;
+    Ok(std::fs::read_to_string(server_name_file)?)
+}
+
+fn get_xdg_dirs() -> anyhow::Result<BaseDirectories> {
+    Ok(BaseDirectories::with_prefix("app-timer2")?)
 }

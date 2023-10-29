@@ -12,6 +12,7 @@ anyhow = "1.0.66"
 chrono = "0.4.23"
 ipc-channel = "0.16.0"
 log = "0.4.17"
+xdg = "2.5.2"
 serde = { version = "1.0.152", features = ["derive"] }
 sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "sqlite"] }
 tokio = { version = "1.22.0", features = ["full"] }
