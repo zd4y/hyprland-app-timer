@@ -72,7 +72,7 @@ async fn run(rx: &mut Receiver<Message>) -> anyhow::Result<()> {
     let ctrlc_handled = AtomicBool::new(false);
     ctrlc::set_handler(move || {
         if !ctrlc_handled.swap(true, Ordering::SeqCst) {
-            log::info!("in ctrlc handler, sending signal...");
+            log::debug!("in ctrlc handler, sending signal...");
             send_stop_signal_blocking().expect("Error sending stop signal")
         }
     })?;
@@ -142,7 +142,7 @@ async fn run_server(pool: &SqlitePool, rx: &mut Receiver<Message>) -> anyhow::Re
                 let duration = now.elapsed();
                 now = Instant::now();
 
-                log::info!("received window: {:?} ||| last_window: {:?} ({:?})", new_last_window, last_window, duration);
+                log::debug!("received window: {:?} ||| last_window: {:?} ({:?})", new_last_window, last_window, duration);
 
                 if let Some(window) = last_window.take() {
                     records.push(new_window(window, duration));
@@ -158,15 +158,15 @@ async fn run_server(pool: &SqlitePool, rx: &mut Receiver<Message>) -> anyhow::Re
 
     // Add the latest window
     if let Some(window) = last_window {
-        log::info!("last window: {:?}", window);
-        log::info!("records before adding last window {:?}", records);
+        log::debug!("last window: {:?}", window);
+        log::debug!("records before adding last window {:?}", records);
         let duration = now.elapsed();
         records.push(new_window(window, duration))
     }
 
     save_windows(pool, &mut records).await?;
 
-    log::info!("exiting program, bye");
+    log::debug!("exiting program, bye");
 
     Ok(())
 }
@@ -176,7 +176,7 @@ async fn save_windows(
     windows: &mut Vec<app_timer2::Window>,
 ) -> anyhow::Result<()> {
     app_timer2::save_windows(pool, windows).await?;
-    log::info!("windows saved: {:?}", windows);
+    log::debug!("windows saved: {:?}", windows);
     windows.clear();
     Ok(())
 }
