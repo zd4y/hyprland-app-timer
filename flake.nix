@@ -6,11 +6,9 @@
     fenix.inputs.nixpkgs.follows = "nixpkgs";
 
     flake-utils.url = "github:numtide/flake-utils";
-
-    flake-compat.url = "https://flakehub.com/f/edolstra/flake-compat/1.tar.gz";
   };
 
-  outputs = { self, nixpkgs, fenix, flake-utils, flake-compat }:
+  outputs = { self, nixpkgs, fenix, flake-utils }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -32,6 +30,7 @@
             pname = cargoToml.package.name;
             src = nixpkgs.lib.cleanSource ./.;
             cargoLock.lockFile = ./Cargo.lock;
+            meta.mainProgram = cargoToml.package.name;
           };
 
         devShells.default =
