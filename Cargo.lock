@@ -77,24 +77,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
 
 [[package]]
-name = "app-timer2"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "ctrlc",
- "env_logger",
- "hyprland",
- "ipc-channel",
- "log",
- "serde",
- "sqlx",
- "tokio",
- "xcb",
- "xdg",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -664,6 +646,24 @@ dependencies = [
  "serde_repr",
  "strum",
  "tokio",
+]
+
+[[package]]
+name = "hyprland-app-timer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "ctrlc",
+ "env_logger",
+ "hyprland",
+ "ipc-channel",
+ "log",
+ "serde",
+ "sqlx",
+ "tokio",
+ "xcb",
+ "xdg",
 ]
 
 [[package]]

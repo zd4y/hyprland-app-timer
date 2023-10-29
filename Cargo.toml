@@ -1,5 +1,5 @@
 [package]
-name = "app-timer2"
+name = "hyprland-app-timer"
 version = "0.1.0"
 edition = "2021"
 

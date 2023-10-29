@@ -262,5 +262,5 @@ fn get_server_name_blocking() -> anyhow::Result<String> {
 }
 
 fn get_xdg_dirs() -> anyhow::Result<BaseDirectories> {
-    Ok(BaseDirectories::with_prefix("app-timer2")?)
+    Ok(BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"))?)
 }
