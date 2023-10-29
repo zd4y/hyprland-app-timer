@@ -30,6 +30,12 @@ pub struct AppDay {
     pub duration: Duration,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub enum Message {
+    Save,
+    Stop,
+}
+
 pub async fn get_pool() -> anyhow::Result<SqlitePool> {
     let database_url = env::var("DATABASE_URL")?;
     let mut options = SqliteConnectOptions::from_str(&database_url)?;
@@ -171,6 +177,18 @@ pub async fn get_app_windows_between(
     Ok(db_apps)
 }
 
+pub async fn send_stop_signal() -> anyhow::Result<()> {
+    send_signal(Message::Stop).await
+}
+
+pub fn send_stop_signal_blocking() -> anyhow::Result<()> {
+    send_signal_blocking(Message::Stop)
+}
+
+pub async fn send_save_signal() -> anyhow::Result<()> {
+    send_signal(Message::Save).await
+}
+
 impl FromRow<'_, SqliteRow> for Window {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
         let datetime = row.try_get("datetime")?;
@@ -205,12 +223,6 @@ impl FromRow<'_, SqliteRow> for AppDay {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub enum Message {
-    Save,
-    Stop,
-}
-
 async fn send_signal(msg: Message) -> anyhow::Result<()> {
     let server_name = tokio::fs::read_to_string(env::var("SERVER_URL_FILE")?).await?;
     let tx = IpcSender::connect(server_name)?;
@@ -223,16 +235,4 @@ fn send_signal_blocking(msg: Message) -> anyhow::Result<()> {
     let tx = IpcSender::connect(server_name)?;
     tx.send(msg)?;
     Ok(())
-}
-
-pub async fn send_stop_signal() -> anyhow::Result<()> {
-    send_signal(Message::Stop).await
-}
-
-pub fn send_stop_signal_blocking() -> anyhow::Result<()> {
-    send_signal_blocking(Message::Stop)
-}
-
-pub async fn send_save_signal() -> anyhow::Result<()> {
-    send_signal(Message::Save).await
 }
