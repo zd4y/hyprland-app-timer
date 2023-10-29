@@ -1,17 +1,10 @@
-{ pkgs ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/nixos-23.05.tar.gz") {} }:
-
-pkgs.mkShell {
-  buildInputs = with pkgs; [
-    gcc
-    pkg-config
-    zlib
-    openssl
-    gcc
-    xorg.libxcb
-    sqlx-cli
-  ];
-
-  DATABASE_URL = "sqlite:" + builtins.getEnv "HOME" + "/app_timer2.db";
-  LOG_FILE = builtins.getEnv "HOME" + "/app-timer2.log";
-  SERVER_URL_FILE = builtins.getEnv "HOME" + "/app-timer2-server.txt";
-}
+(import
+  (
+    let lock = builtins.fromJSON (builtins.readFile ./flake.lock); in
+    fetchTarball {
+      url = lock.nodes.flake-compat.locked.url or "https://github.com/edolstra/flake-compat/archive/${lock.nodes.flake-compat.locked.rev}.tar.gz";
+      sha256 = lock.nodes.flake-compat.locked.narHash;
+    }
+  )
+  { src = ./.; }
+).shellNix
