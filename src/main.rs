@@ -11,11 +11,6 @@ use std::{env, thread};
 use tokio::sync::mpsc::{self, Receiver};
 use tokio::time::interval_at;
 
-use log::LevelFilter;
-use log4rs::append::file::FileAppender;
-use log4rs::config::{Appender, Config, Root};
-use log4rs::encode::pattern::PatternEncoder;
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let mut args = env::args();
@@ -77,16 +72,7 @@ async fn run(rx: &mut Receiver<Message>) -> anyhow::Result<()> {
         }
     })?;
 
-    let logfile = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("<{d} {l}> - {m}\n")))
-        .build(env::var("LOG_FILE")?)?;
-
-    let config = Config::builder()
-        .appender(Appender::builder().build("logfile", Box::new(logfile)))
-        .build(Root::builder().appender("logfile").build(LevelFilter::Info))?;
-
-    log4rs::init_config(config)?;
-    log_panics::init();
+    env_logger::init();
 
     let pool = app_timer2::get_pool().await?;
     run_server(&pool, rx).await?;

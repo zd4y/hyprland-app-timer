@@ -16,12 +16,11 @@ serde = { version = "1.0.152", features = ["derive"] }
 sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "sqlite"] }
 tokio = { version = "1.22.0", features = ["full"] }
 
+env_logger = { version = "0.10.0", optional = true }
 ctrlc = { version = "3.2.3", features = ["termination"], optional = true }
-log-panics = { version = "2.1.0", optional = true }
 hyprland = { version = "0.3.12", optional = true }
-log4rs = { version = "1.2.0", optional = true }
 xcb = { version = "1.2.0", optional = true }
 
 [features]
 default = ["server"]
-server = ["dep:hyprland", "dep:log4rs", "dep:xcb", "dep:log-panics", "dep:ctrlc"]
+server = ["dep:hyprland", "dep:env_logger", "dep:xcb", "dep:ctrlc"]
