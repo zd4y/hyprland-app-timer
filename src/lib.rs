@@ -65,8 +65,8 @@ pub async fn save_windows(pool: &SqlitePool, windows: &[Window]) -> anyhow::Resu
         String::from("INSERT INTO windows_log (datetime, class, title, duration) VALUES");
 
     for (index, _) in to_save.iter().enumerate() {
-        let x = index * 5;
-        query += &format!("\n(?{}, ?{}, ?{}, ?{}),", x + 1, x + 2, x + 3, x + 4,);
+        let i = index * 4;
+        query += &format!("\n(?{}, ?{}, ?{}, ?{}),", i + 1, i + 2, i + 3, i + 4,);
     }
 
     // replace latest `,` with `;`
