@@ -95,7 +95,6 @@ pub async fn get_apps_between(
 ) -> Result<Vec<App>, sqlx::Error> {
     let from = from.to_rfc3339();
     let to = to.to_rfc3339();
-    dbg!(from.clone(), to.clone());
     let db_apps = sqlx::query_as::<_, App>(&format!(
         r#"
             SELECT class, SUM(duration) as duration
@@ -149,7 +148,6 @@ pub async fn get_app_windows_between(
 ) -> Result<Vec<Window>, sqlx::Error> {
     let from = from.to_rfc3339();
     let to = to.to_rfc3339();
-    dbg!(from.clone(), to.clone());
     let db_apps = sqlx::query_as::<_, Window>(
         r#"
             SELECT datetime, title, class, duration
