@@ -33,6 +33,8 @@
               sqlx-cli
               rustc
               cargo
+              clippy
+              rustfmt
             ]);
           };
       });
