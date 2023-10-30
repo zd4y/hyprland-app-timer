@@ -66,14 +66,7 @@ pub async fn save_windows(pool: &SqlitePool, windows: &[Window]) -> anyhow::Resu
 
     for (index, _) in to_save.iter().enumerate() {
         let x = index * 5;
-        query += &format!(
-            "\n(?{}, ?{}, ?{}, ?{}, ?{}),",
-            x + 1,
-            x + 2,
-            x + 3,
-            x + 4,
-            x + 5
-        );
+        query += &format!("\n(?{}, ?{}, ?{}, ?{}),", x + 1, x + 2, x + 3, x + 4,);
     }
 
     // replace latest `,` with `;`
