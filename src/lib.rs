@@ -16,7 +16,7 @@ use xdg::BaseDirectories;
 pub struct Window {
     pub datetime: DateTime<Utc>,
     pub title: String,
-    pub class: (String, String),
+    pub class: String,
     pub duration: Duration,
 }
 
@@ -60,15 +60,14 @@ pub async fn save_windows(pool: &SqlitePool, windows: &[Window]) -> anyhow::Resu
         let duration = window.duration.as_secs_f64();
         to_save.push((
             datetime,
-            &window.class.0,
-            &window.class.1,
+            &window.class,
             &window.title,
             duration,
         ));
     }
 
     let mut query = String::from(
-        "INSERT INTO windows_log (datetime, class_left, class_right, title, duration) VALUES",
+        "INSERT INTO windows_log (datetime, class, title, duration) VALUES",
     );
 
     for (index, _) in to_save.iter().enumerate() {
@@ -95,7 +94,6 @@ pub async fn save_windows(pool: &SqlitePool, windows: &[Window]) -> anyhow::Resu
             .bind(window.1)
             .bind(window.2)
             .bind(window.3)
-            .bind(window.4)
     }
     query.execute(pool).await?;
 
@@ -202,14 +200,13 @@ impl FromRow<'_, SqliteRow> for Window {
         let datetime = row.try_get("datetime")?;
         let datetime = DateTime::parse_from_rfc3339(datetime).unwrap().naive_utc();
         let datetime = Utc.from_utc_datetime(&datetime);
-        let class_left = row.try_get("class_left")?;
-        let class_right = row.try_get("class_right")?;
+        let class = row.try_get("class")?;
         let title = row.try_get("title")?;
         let duration = row.try_get("duration").map(Duration::from_secs_f64)?;
         Ok(Self {
             datetime,
             title,
-            class: (class_left, class_right),
+            class,
             duration,
         })
     }

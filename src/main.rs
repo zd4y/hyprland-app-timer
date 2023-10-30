@@ -171,10 +171,7 @@ fn new_window(
     hyprland_app_timer::Window {
         datetime: Utc::now() - chrono::Duration::from_std(duration).unwrap(),
         title: window_event_data.window_title,
-        class: (
-            window_event_data.window_class.clone(),
-            window_event_data.window_class,
-        ),
+        class: window_event_data.window_class,
         duration,
     }
 }
