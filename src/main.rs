@@ -1,7 +1,7 @@
 use anyhow::bail;
-use hyprland_app_timer::{send_stop_signal_blocking, Message};
 use chrono::Utc;
 use hyprland::event_listener::{EventListener, WindowEventData};
+use hyprland_app_timer::{send_stop_signal_blocking, Message};
 use ipc_channel::ipc::IpcOneShotServer;
 use sqlx::SqlitePool;
 use std::sync::atomic::{AtomicBool, Ordering};

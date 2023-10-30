@@ -58,17 +58,11 @@ pub async fn save_windows(pool: &SqlitePool, windows: &[Window]) -> anyhow::Resu
     for window in windows {
         let datetime = window.datetime.to_rfc3339();
         let duration = window.duration.as_secs_f64();
-        to_save.push((
-            datetime,
-            &window.class,
-            &window.title,
-            duration,
-        ));
+        to_save.push((datetime, &window.class, &window.title, duration));
     }
 
-    let mut query = String::from(
-        "INSERT INTO windows_log (datetime, class, title, duration) VALUES",
-    );
+    let mut query =
+        String::from("INSERT INTO windows_log (datetime, class, title, duration) VALUES");
 
     for (index, _) in to_save.iter().enumerate() {
         let x = index * 5;
