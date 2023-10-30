@@ -105,9 +105,9 @@ pub async fn get_apps_between(
     dbg!(from.clone(), to.clone());
     let db_apps = sqlx::query_as::<_, App>(&format!(
         r#"
-            SELECT class_right, SUM(duration) as duration
+            SELECT class, SUM(duration) as duration
             FROM windows_log WHERE datetime >= ?1 AND datetime < ?2
-            GROUP BY class_right
+            GROUP BY class
             ORDER BY duration {}
         "#,
         if descending { "DESC" } else { "ASC" }
@@ -133,7 +133,7 @@ pub async fn get_daily_app_between(
         r#"
             SELECT strftime('%Y-%m-%d', DATETIME(datetime, '{} hours')) as day, SUM(duration) as duration
             FROM windows_log
-            WHERE datetime >= ?1 AND datetime < ?2 AND class_right = ?3
+            WHERE datetime >= ?1 AND datetime < ?2 AND class = ?3
             GROUP BY day
             ORDER BY day {}
         "#,
@@ -159,8 +159,8 @@ pub async fn get_app_windows_between(
     dbg!(from.clone(), to.clone());
     let db_apps = sqlx::query_as::<_, Window>(
         r#"
-            SELECT datetime, title, class_left, class_right, duration
-            FROM windows_log WHERE datetime >= ?1 AND datetime < ?2 AND class_right = ?3
+            SELECT datetime, title, class, duration
+            FROM windows_log WHERE datetime >= ?1 AND datetime < ?2 AND class = ?3
         "#,
     )
     .bind(from)
@@ -208,7 +208,7 @@ impl FromRow<'_, SqliteRow> for Window {
 
 impl FromRow<'_, SqliteRow> for App {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
-        let app = row.try_get("class_right")?;
+        let app = row.try_get("class")?;
         let duration = row.try_get("duration").map(Duration::from_secs_f64)?;
         Ok(Self { app, duration })
     }
