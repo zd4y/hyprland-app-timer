@@ -1,18 +1,13 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-
-    fenix.url = "github:nix-community/fenix";
-    fenix.inputs.nixpkgs.follows = "nixpkgs";
-
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, fenix, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        toolchain = fenix.packages.${system}.stable.toolchain;
         buildInputs = with pkgs; [ openssl ];
         nativeBuildInputs = with pkgs; [ pkg-config ];
       in
@@ -21,10 +16,7 @@
           let
             cargoToml = with builtins; (fromTOML (readFile ./Cargo.toml));
           in
-          (pkgs.makeRustPlatform {
-            cargo = toolchain;
-            rustc = toolchain;
-          }).buildRustPackage {
+          pkgs.rustPlatform.buildRustPackage {
             inherit nativeBuildInputs buildInputs;
             inherit (cargoToml.package) version;
             pname = cargoToml.package.name;
@@ -39,7 +31,8 @@
 
             buildInputs = buildInputs ++ (with pkgs; [
               sqlx-cli
-              toolchain
+              rustc
+              cargo
             ]);
           };
       });
