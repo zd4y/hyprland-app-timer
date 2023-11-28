@@ -34,10 +34,10 @@ async fn main() -> anyhow::Result<()> {
 
             let tx2 = tx.clone();
             let handle = thread::spawn(move || {
+                let (server, server_name) = IpcOneShotServer::<Message>::new()?;
+                hyprland_app_timer::set_server_name_blocking(&server_name)?;
+                let (receiver, mut message) = server.accept()?;
                 loop {
-                    let (server, server_name) = IpcOneShotServer::<Message>::new()?;
-                    hyprland_app_timer::set_server_name_blocking(&server_name)?;
-                    let message = server.accept()?.1;
                     match message {
                         Message::Save => {
                             tx2.blocking_send(Message::Save)?;
@@ -47,6 +47,7 @@ async fn main() -> anyhow::Result<()> {
                             break;
                         }
                     };
+                    message = receiver.recv()?;
                 }
                 Ok::<(), anyhow::Error>(())
             });

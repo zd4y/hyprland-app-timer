@@ -1,7 +1,7 @@
 use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 pub use sqlx::SqlitePool;
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteRow},
@@ -21,14 +21,14 @@ pub struct Window {
 }
 
 #[derive(Debug)]
-pub struct App {
+pub struct AppUsage {
     pub app: String,
     pub duration: Duration,
 }
 
 #[derive(Debug)]
-pub struct AppDay {
-    pub date: String,
+pub struct AppUsageDay {
+    pub date_utc: NaiveDate,
     pub duration: Duration,
 }
 
@@ -69,7 +69,7 @@ pub async fn save_windows(pool: &SqlitePool, windows: &[Window]) -> anyhow::Resu
         query += &format!("\n(?{}, ?{}, ?{}, ?{}),", i + 1, i + 2, i + 3, i + 4,);
     }
 
-    // replace latest `,` with `;`
+    // replace last `,` with `;`
     let mut query = query.chars();
     query.next_back();
     let query = format!("{};", query.as_str());
@@ -87,23 +87,22 @@ pub async fn save_windows(pool: &SqlitePool, windows: &[Window]) -> anyhow::Resu
     Ok(())
 }
 
-pub async fn get_apps_between(
+pub async fn get_apps_usage(
     pool: &SqlitePool,
     from: DateTime<Utc>,
     to: DateTime<Utc>,
-    descending: bool,
-) -> Result<Vec<App>, sqlx::Error> {
+) -> Result<Vec<AppUsage>, sqlx::Error> {
     let from = from.to_rfc3339();
     let to = to.to_rfc3339();
-    let db_apps = sqlx::query_as::<_, App>(&format!(
+    let db_apps = sqlx::query_as::<_, AppUsage>(
         r#"
             SELECT class, SUM(duration) as duration
             FROM windows_log WHERE datetime >= ?1 AND datetime < ?2
             GROUP BY class
-            ORDER BY duration {}
+            ORDER BY duration
+            DESC
         "#,
-        if descending { "DESC" } else { "ASC" }
-    ))
+    )
     .bind(from)
     .bind(to)
     .fetch_all(pool)
@@ -111,27 +110,24 @@ pub async fn get_apps_between(
     Ok(db_apps)
 }
 
-pub async fn get_daily_app_between(
+pub async fn get_daily_app_usage(
     pool: &SqlitePool,
     app: &str,
     from: DateTime<Utc>,
     to: DateTime<Utc>,
-    offset_hours: i32,
-    descending: bool,
-) -> Result<Vec<AppDay>, sqlx::Error> {
+) -> Result<Vec<AppUsageDay>, sqlx::Error> {
     let from = from.to_rfc3339();
     let to = to.to_rfc3339();
-    let db_windows = sqlx::query_as::<_, AppDay>(&format!(
+    let db_windows = sqlx::query_as::<_, AppUsageDay>(
         r#"
-            SELECT strftime('%Y-%m-%d', DATETIME(datetime, '{} hours')) as day, SUM(duration) as duration
+            SELECT strftime('%Y-%m-%d', DATETIME(datetime)) as day, SUM(duration) as duration
             FROM windows_log
             WHERE datetime >= ?1 AND datetime < ?2 AND class = ?3
             GROUP BY day
-            ORDER BY day {}
+            ORDER BY day
+            DESC
         "#,
-        offset_hours,
-        if descending { "DESC" } else { "ASC" }
-    ))
+    )
     .bind(from)
     .bind(to)
     .bind(app)
@@ -197,7 +193,7 @@ impl FromRow<'_, SqliteRow> for Window {
     }
 }
 
-impl FromRow<'_, SqliteRow> for App {
+impl FromRow<'_, SqliteRow> for AppUsage {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
         let app = row.try_get("class")?;
         let duration = row.try_get("duration").map(Duration::from_secs_f64)?;
@@ -205,11 +201,12 @@ impl FromRow<'_, SqliteRow> for App {
     }
 }
 
-impl FromRow<'_, SqliteRow> for AppDay {
+impl FromRow<'_, SqliteRow> for AppUsageDay {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
-        let date = row.try_get("day")?;
+        let day = row.try_get("day")?;
+        let date_utc = NaiveDate::parse_from_str(day, "%Y-%m-%d").unwrap();
         let duration = row.try_get("duration").map(Duration::from_secs_f64)?;
-        Ok(Self { date, duration })
+        Ok(Self { date_utc, duration })
     }
 }
 
