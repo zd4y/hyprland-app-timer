@@ -1,3 +1,6 @@
+#[cfg(feature = "server")]
+pub mod server;
+
 use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
@@ -8,8 +11,6 @@ use sqlx::{
     ConnectOptions, FromRow, Row,
 };
 
-use ipc_channel::ipc::IpcSender;
-use serde::{Deserialize, Serialize};
 use xdg::BaseDirectories;
 
 #[derive(Debug)]
@@ -30,12 +31,6 @@ pub struct AppUsage {
 pub struct AppUsageDay {
     pub date_utc: NaiveDate,
     pub duration: Duration,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub enum Message {
-    Save,
-    Stop,
 }
 
 pub async fn get_pool() -> anyhow::Result<SqlitePool> {
@@ -158,24 +153,6 @@ pub async fn get_app_windows_between(
     Ok(db_apps)
 }
 
-pub async fn send_stop_signal() -> anyhow::Result<()> {
-    send_signal(Message::Stop).await
-}
-
-pub fn send_stop_signal_blocking() -> anyhow::Result<()> {
-    send_signal_blocking(Message::Stop)
-}
-
-pub async fn send_save_signal() -> anyhow::Result<()> {
-    send_signal(Message::Save).await
-}
-
-pub fn set_server_name_blocking(name: &str) -> anyhow::Result<()> {
-    let server_name_file = get_xdg_dirs()?.place_data_file("server.txt")?;
-    std::fs::write(server_name_file, name)?;
-    Ok(())
-}
-
 impl FromRow<'_, SqliteRow> for Window {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
         let datetime = row.try_get("datetime")?;
@@ -210,34 +187,10 @@ impl FromRow<'_, SqliteRow> for AppUsageDay {
     }
 }
 
-async fn send_signal(msg: Message) -> anyhow::Result<()> {
-    let server_name = get_server_name().await?;
-    let tx = IpcSender::connect(server_name)?;
-    tx.send(msg)?;
-    Ok(())
-}
-
-fn send_signal_blocking(msg: Message) -> anyhow::Result<()> {
-    let server_name = get_server_name_blocking()?;
-    let tx = IpcSender::connect(server_name)?;
-    tx.send(msg)?;
-    Ok(())
-}
-
 fn get_database_url() -> anyhow::Result<String> {
     let path = get_xdg_dirs()?.place_data_file("apps.db")?;
     let path_str = path.to_str().context("database path is not unicode")?;
     Ok(format!("sqlite:{path_str}"))
-}
-
-async fn get_server_name() -> anyhow::Result<String> {
-    let server_name_file = get_xdg_dirs()?.place_data_file("server.txt")?;
-    Ok(tokio::fs::read_to_string(server_name_file).await?)
-}
-
-fn get_server_name_blocking() -> anyhow::Result<String> {
-    let server_name_file = get_xdg_dirs()?.place_data_file("server.txt")?;
-    Ok(std::fs::read_to_string(server_name_file)?)
 }
 
 fn get_xdg_dirs() -> anyhow::Result<BaseDirectories> {
