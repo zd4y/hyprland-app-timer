@@ -1,16 +1,14 @@
 #[cfg(feature = "server")]
 pub mod server;
 
+pub mod blocking_client;
 mod client;
 
-pub use client::Client;
-
-use std::time::Duration;
-
 use chrono::{DateTime, NaiveDate, Utc};
-pub use sqlx::SqlitePool;
-
+use std::time::Duration;
 use xdg::BaseDirectories;
+
+pub use client::Client;
 
 #[derive(Debug)]
 pub struct Window {
