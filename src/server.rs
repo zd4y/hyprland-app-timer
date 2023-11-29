@@ -16,28 +16,25 @@ impl Server {
     pub async fn new() -> anyhow::Result<Server> {
         let (tx, rx) = mpsc::channel(1);
         let tx2 = tx.clone();
-        thread::spawn(move || {
+        thread::spawn(move || loop {
             let (ipc_server, ipc_server_name) =
                 IpcOneShotServer::new().expect("failed to create ipc server");
             Server::save_ipc_server_name(&ipc_server_name).expect("failed to save ipc server name");
-            let (receiver, mut message) = ipc_server
+            let (_, message) = ipc_server
                 .accept()
                 .expect("failed to accept message from ipc server");
-            loop {
-                match message {
-                    Message::Ping => {}
-                    Message::Save => {
-                        tx2.blocking_send(Message::Save)
-                            .expect("failed to send message");
-                    }
-                    Message::Stop => {
-                        tx2.blocking_send(Message::Stop)
-                            .expect("failed to send message");
-                        break;
-                    }
-                };
-                message = receiver.recv().expect("failed to receive message");
-            }
+            match message {
+                Message::Ping => {}
+                Message::Save => {
+                    tx2.blocking_send(Message::Save)
+                        .expect("failed to send message");
+                }
+                Message::Stop => {
+                    tx2.blocking_send(Message::Stop)
+                        .expect("failed to send message");
+                    break;
+                }
+            };
         });
         let pool = crate::get_pool().await?;
         Ok(Server { pool, rx })
