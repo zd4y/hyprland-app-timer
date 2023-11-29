@@ -15,10 +15,6 @@ impl BlockingClient {
         Ok(BlockingClient { inner, rt })
     }
 
-    pub fn save_windows(&self, windows: &[crate::Window]) -> anyhow::Result<()> {
-        self.rt.block_on(self.inner.save_windows(windows))
-    }
-
     pub fn get_apps_usage(
         &self,
         from: DateTime<Utc>,

@@ -23,45 +23,6 @@ impl Client {
         Ok(Client { pool })
     }
 
-    pub async fn save_windows(&self, windows: &[crate::Window]) -> anyhow::Result<()> {
-        if windows.is_empty() {
-            return Ok(());
-        }
-
-        let mut to_save = Vec::new();
-
-        for window in windows {
-            let datetime = window.datetime.to_rfc3339();
-            let duration = window.duration.as_secs_f64();
-            to_save.push((datetime, &window.class, &window.title, duration));
-        }
-
-        let mut query =
-            String::from("INSERT INTO windows_log (datetime, class, title, duration) VALUES");
-
-        for (index, _) in to_save.iter().enumerate() {
-            let i = index * 4;
-            query += &format!("\n(?{}, ?{}, ?{}, ?{}),", i + 1, i + 2, i + 3, i + 4,);
-        }
-
-        // replace last `,` with `;`
-        let mut query = query.chars();
-        query.next_back();
-        let query = format!("{};", query.as_str());
-
-        let mut query = sqlx::query(&query);
-        for window in to_save {
-            query = query
-                .bind(window.0)
-                .bind(window.1)
-                .bind(window.2)
-                .bind(window.3)
-        }
-        query.execute(&self.pool).await?;
-
-        Ok(())
-    }
-
     pub async fn get_apps_usage(
         &self,
         from: DateTime<Utc>,
@@ -131,6 +92,45 @@ impl Client {
         .fetch_all(&self.pool)
         .await?;
         Ok(db_apps)
+    }
+
+    pub(crate) async fn save_windows(&self, windows: &[crate::Window]) -> anyhow::Result<()> {
+        if windows.is_empty() {
+            return Ok(());
+        }
+
+        let mut to_save = Vec::new();
+
+        for window in windows {
+            let datetime = window.datetime.to_rfc3339();
+            let duration = window.duration.as_secs_f64();
+            to_save.push((datetime, &window.class, &window.title, duration));
+        }
+
+        let mut query =
+            String::from("INSERT INTO windows_log (datetime, class, title, duration) VALUES");
+
+        for (index, _) in to_save.iter().enumerate() {
+            let i = index * 4;
+            query += &format!("\n(?{}, ?{}, ?{}, ?{}),", i + 1, i + 2, i + 3, i + 4,);
+        }
+
+        // replace last `,` with `;`
+        let mut query = query.chars();
+        query.next_back();
+        let query = format!("{};", query.as_str());
+
+        let mut query = sqlx::query(&query);
+        for window in to_save {
+            query = query
+                .bind(window.0)
+                .bind(window.1)
+                .bind(window.2)
+                .bind(window.3)
+        }
+        query.execute(&self.pool).await?;
+
+        Ok(())
     }
 
     fn get_database_url() -> anyhow::Result<String> {
