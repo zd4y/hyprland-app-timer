@@ -4,11 +4,12 @@ use chrono::Utc;
 use hyprland::event_listener::{EventListener, WindowEventData};
 use ipc_channel::ipc::{IpcOneShotServer, IpcSender};
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
 use tokio::{sync::mpsc, time::interval_at};
 
+use crate::Client;
+
 pub struct Server {
-    pool: SqlitePool,
+    client: Client,
     rx: mpsc::Receiver<Message>,
 }
 
@@ -36,8 +37,8 @@ impl Server {
                 }
             };
         });
-        let pool = crate::get_pool().await?;
-        Ok(Server { pool, rx })
+        let client = Client::new().await?;
+        Ok(Server { client, rx })
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
@@ -77,12 +78,12 @@ impl Server {
                 Some(signal) = self.rx.recv() => match signal {
                     Message::Ping => {}
                     Message::Save => {
-                        save_windows(&self.pool, &mut records).await?;
+                        self.save_windows(&mut records).await?;
                     }
                     Message::Stop => break,
                 },
                 _ = interval.tick() => {
-                    save_windows(&self.pool, &mut records).await?;
+                    self.save_windows(&mut records).await?;
                 }
                 Some(new_last_window) = windows_receiver.recv() => {
                     let duration = now.elapsed();
@@ -96,7 +97,7 @@ impl Server {
                     last_window = new_last_window;
 
                     if records.len() >= 100 {
-                        save_windows(&self.pool, &mut records).await?;
+                        self.save_windows(&mut records).await?;
                     }
                 }
             }
@@ -110,7 +111,7 @@ impl Server {
             records.push(new_window(window, duration))
         }
 
-        save_windows(&self.pool, &mut records).await?;
+        self.save_windows(&mut records).await?;
 
         log::debug!("exiting program, bye");
 
@@ -162,13 +163,13 @@ impl Server {
         std::fs::write(server_name_file, name)?;
         Ok(())
     }
-}
 
-async fn save_windows(pool: &SqlitePool, windows: &mut Vec<crate::Window>) -> anyhow::Result<()> {
-    crate::save_windows(pool, windows).await?;
-    log::debug!("windows saved: {:?}", windows);
-    windows.clear();
-    Ok(())
+    async fn save_windows(&self, windows: &mut Vec<crate::Window>) -> anyhow::Result<()> {
+        self.client.save_windows(windows).await?;
+        log::debug!("windows saved: {:?}", windows);
+        windows.clear();
+        Ok(())
+    }
 }
 
 fn new_window(window_event_data: WindowEventData, duration: std::time::Duration) -> crate::Window {
