@@ -8,6 +8,7 @@ use sqlx::{
     ConnectOptions, Row, SqlitePool,
 };
 
+#[derive(Debug)]
 pub struct Client {
     pool: SqlitePool,
 }

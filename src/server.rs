@@ -8,6 +8,7 @@ use tokio::{sync::mpsc, time::interval_at};
 
 use crate::Client;
 
+#[derive(Debug)]
 pub struct Server {
     client: Client,
     rx: mpsc::Receiver<Message>,
