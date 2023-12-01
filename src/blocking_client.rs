@@ -1,12 +1,12 @@
 use chrono::{DateTime, Utc};
 use tokio::runtime::Runtime;
 
+#[derive(Debug)]
 pub struct BlockingClient {
     inner: crate::Client,
     rt: Runtime,
 }
 
-#[derive(Debug)]
 impl BlockingClient {
     pub fn new() -> anyhow::Result<BlockingClient> {
         let rt = tokio::runtime::Builder::new_current_thread()
