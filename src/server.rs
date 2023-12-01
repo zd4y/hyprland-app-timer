@@ -2,7 +2,7 @@ use std::{thread, time::Instant};
 
 use chrono::Utc;
 use hyprland::event_listener::{EventListener, WindowEventData};
-use ipc_channel::ipc::{IpcOneShotServer, IpcSender};
+use ipc_channel::ipc::{self, IpcOneShotServer, IpcSender};
 use serde::{Deserialize, Serialize};
 use tokio::{sync::mpsc, time::interval_at};
 
@@ -21,7 +21,8 @@ impl Server {
         thread::spawn(move || loop {
             let (ipc_server, ipc_server_name) =
                 IpcOneShotServer::new().expect("failed to create ipc server");
-            Server::save_ipc_server_name(&ipc_server_name).expect("failed to save ipc server name");
+            Server::blocking_save_ipc_server_name(&ipc_server_name)
+                .expect("failed to save ipc server name");
             let (_, message) = ipc_server
                 .accept()
                 .expect("failed to accept message from ipc server");
@@ -29,6 +30,10 @@ impl Server {
                 Message::Ping => {}
                 Message::Save => {
                     tx2.blocking_send(Message::Save)
+                        .expect("failed to send message");
+                }
+                Message::SaveWaiting(tx) => {
+                    tx2.blocking_send(Message::SaveWaiting(tx))
                         .expect("failed to send message");
                 }
                 Message::Stop => {
@@ -81,6 +86,12 @@ impl Server {
                     Message::Save => {
                         self.save_windows(&mut records).await?;
                     }
+                    Message::SaveWaiting(tx) => {
+                        self.save_windows(&mut records).await?;
+                        tokio::task::spawn_blocking(move || {
+                            tx.send(()).expect("failed to send");
+                        });
+                    }
                     Message::Stop => break,
                 },
                 _ = interval.tick() => {
@@ -127,39 +138,46 @@ impl Server {
         Server::send_signal(Message::Stop).await
     }
 
-    pub fn stop_blocking() -> anyhow::Result<()> {
-        Server::send_signal_blocking(Message::Stop)
+    pub fn blocking_stop() -> anyhow::Result<()> {
+        Server::blocking_send_signal(Message::Stop)
     }
 
     pub async fn save() -> anyhow::Result<()> {
         Server::send_signal(Message::Save).await
     }
 
+    pub fn blocking_save_waiting() -> anyhow::Result<()> {
+        let (tx, rx) = ipc::channel()?;
+        Server::blocking_send_signal(Message::SaveWaiting(tx))?;
+        rx.recv()?;
+        Ok(())
+    }
+
     async fn send_signal(msg: Message) -> anyhow::Result<()> {
-        let server_name = Server::ipc_server_name().await?;
+        let server_name = Server::get_ipc_server_name().await?;
         let tx = IpcSender::connect(server_name)?;
         tx.send(msg)?;
         Ok(())
     }
 
-    fn send_signal_blocking(msg: Message) -> anyhow::Result<()> {
-        let server_name = Server::ipc_server_name_blocking()?;
+    fn blocking_send_signal(msg: Message) -> anyhow::Result<()> {
+        let server_name = Server::blocking_get_ipc_server_name()?;
         let tx = IpcSender::connect(server_name)?;
         tx.send(msg)?;
         Ok(())
     }
 
-    async fn ipc_server_name() -> anyhow::Result<String> {
+    async fn get_ipc_server_name() -> anyhow::Result<String> {
         let server_name_file = crate::get_xdg_dirs()?.place_data_file("server.txt")?;
         Ok(tokio::fs::read_to_string(server_name_file).await?)
     }
 
-    fn ipc_server_name_blocking() -> anyhow::Result<String> {
+    fn blocking_get_ipc_server_name() -> anyhow::Result<String> {
         let server_name_file = crate::get_xdg_dirs()?.place_data_file("server.txt")?;
         Ok(std::fs::read_to_string(server_name_file)?)
     }
 
-    fn save_ipc_server_name(name: &str) -> anyhow::Result<()> {
+    fn blocking_save_ipc_server_name(name: &str) -> anyhow::Result<()> {
         let server_name_file = crate::get_xdg_dirs()?.place_data_file("server.txt")?;
         std::fs::write(server_name_file, name)?;
         Ok(())
@@ -185,6 +203,7 @@ fn new_window(window_event_data: WindowEventData, duration: std::time::Duration)
 #[derive(Serialize, Deserialize, Debug)]
 enum Message {
     Ping,
+    SaveWaiting(IpcSender<()>),
     Save,
     Stop,
 }
