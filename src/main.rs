@@ -1,9 +1,7 @@
 use anyhow::bail;
 use hyprland_app_timer::server::Server;
-use std::{
-    env,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use std::env;
+use tokio::signal::{self, unix, unix::SignalKind};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -23,26 +21,26 @@ async fn main() -> anyhow::Result<()> {
                 bail!("already running")
             }
 
-            run().await?;
-
-            Ok(())
+            run().await
         }
     }
 }
 
 async fn run() -> anyhow::Result<()> {
-    let ctrlc_handled = AtomicBool::new(false);
-    ctrlc::set_handler(move || {
-        if !ctrlc_handled.swap(true, Ordering::SeqCst) {
-            log::debug!("in ctrlc handler, sending signal...");
-            Server::stop_blocking().expect("Error sending stop signal")
-        }
-    })?;
+    tokio::spawn(async {
+        let mut hangup =
+            unix::signal(SignalKind::hangup()).expect("failed to listen to hangup signal");
+        let mut terminate =
+            unix::signal(SignalKind::terminate()).expect("failed to listen to terminate signal");
+        tokio::select! {
+            _ = signal::ctrl_c() => {},
+            _ = hangup.recv() => {},
+            _ = terminate.recv() => {}
+        };
+        Server::stop().await.expect("failed to send stop signal")
+    });
 
     env_logger::init();
 
-    let mut server = Server::new().await?;
-    server.run().await?;
-
-    Ok(())
+    Server::new().await?.run().await
 }

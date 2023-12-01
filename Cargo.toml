@@ -14,10 +14,9 @@ sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "sqlite"] }
 tokio = { version = "1.22.0", features = ["full"] }
 
 env_logger = { version = "0.10.0", optional = true }
-ctrlc = { version = "3.2.3", features = ["termination"], optional = true }
 hyprland = { version = "0.3.12", optional = true }
 xcb = { version = "1.2.0", optional = true }
 
 [features]
 default = ["server"]
-server = ["dep:hyprland", "dep:env_logger", "dep:xcb", "dep:ctrlc"]
+server = ["dep:hyprland", "dep:env_logger", "dep:xcb"]
