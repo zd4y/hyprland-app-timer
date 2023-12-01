@@ -146,6 +146,14 @@ impl Server {
         Server::send_signal(Message::Save).await
     }
 
+    pub async fn save_waiting() -> anyhow::Result<tokio::task::JoinHandle<Result<(), ipc::IpcError>>>
+    {
+        let (tx, rx) = ipc::channel()?;
+        Server::send_signal(Message::SaveWaiting(tx)).await?;
+        let handle = tokio::task::spawn_blocking(move || rx.recv());
+        Ok(handle)
+    }
+
     pub fn blocking_save_waiting() -> anyhow::Result<()> {
         let (tx, rx) = ipc::channel()?;
         Server::blocking_send_signal(Message::SaveWaiting(tx))?;
