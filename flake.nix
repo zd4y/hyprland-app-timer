@@ -20,7 +20,7 @@
             inherit nativeBuildInputs buildInputs;
             inherit (cargoToml.package) version;
             pname = cargoToml.package.name;
-            src = nixpkgs.lib.cleanSource ./.;
+            src = pkgs.lib.cleanSource ./.;
             cargoLock.lockFile = ./Cargo.lock;
             meta.mainProgram = cargoToml.package.name;
           };
