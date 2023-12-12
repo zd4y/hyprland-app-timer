@@ -48,7 +48,7 @@ impl Server {
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
-        let (windows_sender, mut windows_receiver) = mpsc::channel(100);
+        let (windows_sender, mut windows_receiver) = mpsc::channel(1);
         let windows_sender2 = windows_sender.clone();
 
         let mut event_listener = EventListener::new();
