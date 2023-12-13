@@ -63,7 +63,7 @@ impl Server {
                 .blocking_send(None)
                 .expect("failed sending window");
         });
-        event_listener.add_active_monitor_change_handler(move |_| {
+        event_listener.add_workspace_added_handler(move |_| {
             windows_sender3
                 .blocking_send(None)
                 .expect("failed sending window");
