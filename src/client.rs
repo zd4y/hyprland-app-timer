@@ -1,7 +1,7 @@
 use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, Local, NaiveDate, TimeZone, Utc};
 use sqlx::{
     prelude::FromRow,
     sqlite::{SqliteConnectOptions, SqliteRow},
@@ -50,23 +50,24 @@ impl Client {
     pub async fn get_daily_app_usage(
         &self,
         app: &str,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    ) -> Result<Vec<crate::AppUsageDay>, sqlx::Error> {
-        let from = from.to_rfc3339();
-        let to = to.to_rfc3339();
+        from: DateTime<Local>,
+        to: DateTime<Local>,
+    ) -> anyhow::Result<Vec<crate::AppUsageDay>> {
+        let from_utc = to_utc(from).to_rfc3339();
+        let to_utc = to_utc(to).to_rfc3339();
+        let offset_seconds = from.offset().local_minus_utc();
         let db_windows = sqlx::query_as::<_, crate::AppUsageDay>(
+            &format!(
             r#"
-            SELECT strftime('%Y-%m-%d', DATETIME(datetime)) as day, SUM(duration) as duration
+            SELECT strftime('%Y-%m-%d', DATETIME(datetime, '{} seconds')) as date_local, SUM(duration) as duration
             FROM windows_log
             WHERE datetime >= ?1 AND datetime < ?2 AND class = ?3
-            GROUP BY day
-            ORDER BY day
-            DESC
-        "#,
-        )
-        .bind(from)
-        .bind(to)
+            GROUP BY date_local
+            ORDER BY date_local
+            ASC
+        "# , offset_seconds))
+        .bind(from_utc)
+        .bind(to_utc)
         .bind(app)
         .fetch_all(&self.pool)
         .await?;
@@ -168,9 +169,16 @@ impl FromRow<'_, SqliteRow> for crate::AppUsage {
 
 impl FromRow<'_, SqliteRow> for crate::AppUsageDay {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
-        let day = row.try_get("day")?;
-        let date_utc = NaiveDate::parse_from_str(day, "%Y-%m-%d").unwrap();
+        let day = row.try_get("date_local")?;
+        let date_local = NaiveDate::parse_from_str(day, "%Y-%m-%d").unwrap();
         let duration = row.try_get("duration").map(Duration::from_secs_f64)?;
-        Ok(Self { date_utc, duration })
+        Ok(Self {
+            date_local,
+            duration,
+        })
     }
+}
+
+fn to_utc(datetime: DateTime<Local>) -> DateTime<Utc> {
+    datetime.naive_utc().and_utc()
 }

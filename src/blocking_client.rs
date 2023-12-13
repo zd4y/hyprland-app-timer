@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use tokio::runtime::Runtime;
 
 #[derive(Debug)]
@@ -27,9 +27,9 @@ impl BlockingClient {
     pub async fn get_daily_app_usage(
         &self,
         app: &str,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    ) -> Result<Vec<crate::AppUsageDay>, sqlx::Error> {
+        from: DateTime<Local>,
+        to: DateTime<Local>,
+    ) -> anyhow::Result<Vec<crate::AppUsageDay>> {
         self.rt
             .block_on(self.inner.get_daily_app_usage(app, from, to))
     }

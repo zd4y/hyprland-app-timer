@@ -26,7 +26,7 @@ pub struct AppUsage {
 
 #[derive(Debug)]
 pub struct AppUsageDay {
-    pub date_utc: NaiveDate,
+    pub date_local: NaiveDate,
     pub duration: Duration,
 }
 
