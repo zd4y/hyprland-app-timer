@@ -50,6 +50,7 @@ impl Server {
     pub async fn run(&mut self) -> anyhow::Result<()> {
         let (windows_sender, mut windows_receiver) = mpsc::channel(100);
         let windows_sender2 = windows_sender.clone();
+        let windows_sender3 = windows_sender.clone();
 
         let mut event_listener = EventListener::new();
         event_listener.add_active_window_change_handler(move |data| {
@@ -59,6 +60,11 @@ impl Server {
         });
         event_listener.add_window_close_handler(move |_| {
             windows_sender2
+                .blocking_send(None)
+                .expect("failed sending window");
+        });
+        event_listener.add_active_monitor_change_handler(move |_| {
+            windows_sender3
                 .blocking_send(None)
                 .expect("failed sending window");
         });
