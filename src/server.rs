@@ -52,26 +52,24 @@ impl Server {
         let windows_sender2 = windows_sender.clone();
         let windows_sender3 = windows_sender.clone();
 
-        let mut event_listener = EventListener::new();
-        event_listener.add_active_window_change_handler(move |data| {
-            windows_sender
-                .blocking_send(data)
-                .expect("failed sending window");
-        });
-        event_listener.add_window_close_handler(move |_| {
-            windows_sender2
-                .blocking_send(None)
-                .expect("failed sending window");
-        });
-        event_listener.add_workspace_added_handler(move |_| {
-            windows_sender3
-                .blocking_send(None)
-                .expect("failed sending window");
-        });
         thread::spawn(move || {
-            event_listener
-                .start_listener()
-                .expect("error starting listener");
+            let mut event_listener = EventListener::new();
+            event_listener.add_active_window_change_handler(move |data| {
+                windows_sender
+                    .blocking_send(data)
+                    .expect("failed sending window");
+            });
+            event_listener.add_window_close_handler(move |_| {
+                windows_sender2
+                    .blocking_send(None)
+                    .expect("failed sending window");
+            });
+            event_listener.add_workspace_added_handler(move |_| {
+                windows_sender3
+                    .blocking_send(None)
+                    .expect("failed sending window");
+            });
+            event_listener.start_listener().expect("failed to start event listener")
         });
 
         let mut now = Instant::now();
