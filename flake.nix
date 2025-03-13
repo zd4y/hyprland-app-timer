@@ -22,7 +22,8 @@
             pname = cargoToml.package.name;
             src = pkgs.lib.cleanSource ./.;
             cargoLock.lockFile = ./Cargo.lock;
-            meta.mainProgram = cargoToml.package.name;
+            meta.mainProgram = "${cargoToml.package.name}-server";
+            buildFeatures = [ "client" "server" ];
           };
 
         devShells.default =

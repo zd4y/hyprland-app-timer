@@ -1,184 +1,84 @@
-use std::{str::FromStr, time::Duration};
+use std::path::PathBuf;
 
-use anyhow::Context;
-use chrono::{DateTime, Local, NaiveDate, TimeZone, Utc};
-use sqlx::{
-    prelude::FromRow,
-    sqlite::{SqliteConnectOptions, SqliteRow},
-    ConnectOptions, Row, SqlitePool,
+#[cfg(feature = "tokio")]
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::UnixStream,
 };
+
+use crate::{Message, ResponseMessage};
 
 #[derive(Debug)]
 pub struct Client {
-    pool: SqlitePool,
+    socket_path: PathBuf,
 }
 
 impl Client {
+    #[cfg(feature = "tokio")]
     pub async fn new() -> anyhow::Result<Client> {
-        let database_url = Client::get_database_url()?;
-        let mut options = SqliteConnectOptions::from_str(&database_url)?.create_if_missing(true);
-        options.disable_statement_logging();
-        let pool = SqlitePool::connect_with(options).await?;
-        log::debug!("Connected to sqlite pool {}", database_url);
-        sqlx::migrate!("./migrations").run(&pool).await?;
-        Ok(Client { pool })
+        let socket_path = crate::get_socket_path().await?;
+        Ok(Self { socket_path })
     }
 
-    pub async fn get_apps_usage(
-        &self,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    ) -> Result<Vec<crate::AppUsage>, sqlx::Error> {
-        let from = from.to_rfc3339();
-        let to = to.to_rfc3339();
-        let db_apps = sqlx::query_as::<_, crate::AppUsage>(
-            r#"
-            SELECT class, SUM(duration) as duration
-            FROM windows_log WHERE datetime >= ?1 AND datetime < ?2
-            GROUP BY class
-            ORDER BY duration
-            DESC
-        "#,
-        )
-        .bind(from)
-        .bind(to)
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(db_apps)
+    pub fn blocking_new() -> anyhow::Result<Client> {
+        let socket_path = crate::blocking_get_socket_path()?;
+        Ok(Self { socket_path })
     }
 
-    pub async fn get_daily_app_usage(
-        &self,
-        app: &str,
-        from: DateTime<Local>,
-        to: DateTime<Local>,
-    ) -> anyhow::Result<Vec<crate::AppUsageDay>> {
-        let from_utc = to_utc(from).to_rfc3339();
-        let to_utc = to_utc(to).to_rfc3339();
-        let offset_seconds = from.offset().local_minus_utc();
-        let db_windows = sqlx::query_as::<_, crate::AppUsageDay>(
-            &format!(
-            r#"
-            SELECT strftime('%Y-%m-%d', DATETIME(datetime, '{} seconds')) as date_local, SUM(duration) as duration
-            FROM windows_log
-            WHERE datetime >= ?1 AND datetime < ?2 AND class = ?3
-            GROUP BY date_local
-            ORDER BY date_local
-            ASC
-        "# , offset_seconds))
-        .bind(from_utc)
-        .bind(to_utc)
-        .bind(app)
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(db_windows)
+    #[cfg(feature = "tokio")]
+    pub async fn ping(&self) -> anyhow::Result<()> {
+        self.send_message(Message::Ping).await
     }
 
-    pub async fn get_app_windows_between(
-        &self,
-        app: &str,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    ) -> Result<Vec<crate::Window>, sqlx::Error> {
-        let from = from.to_rfc3339();
-        let to = to.to_rfc3339();
-        let db_apps = sqlx::query_as::<_, crate::Window>(
-            r#"
-                SELECT datetime, title, class, duration
-                FROM windows_log WHERE datetime >= ?1 AND datetime < ?2 AND class = ?3
-            "#,
-        )
-        .bind(from)
-        .bind(to)
-        .bind(app)
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(db_apps)
+    #[cfg(feature = "tokio")]
+    pub async fn stop(&self) -> anyhow::Result<()> {
+        self.send_message(Message::Stop).await
     }
 
-    pub(crate) async fn save_windows(&self, windows: &[crate::Window]) -> anyhow::Result<()> {
-        if windows.is_empty() {
-            return Ok(());
+    pub fn blocking_stop(&self) -> anyhow::Result<()> {
+        self.blocking_send_message(Message::Stop)
+    }
+
+    #[cfg(feature = "tokio")]
+    pub async fn save(&self) -> anyhow::Result<()> {
+        self.send_message(Message::Save).await
+    }
+
+    pub fn blocking_save(&self) -> anyhow::Result<()> {
+        self.blocking_send_message(Message::Save)
+    }
+
+    #[cfg(feature = "tokio")]
+    async fn send_message(&self, msg: Message) -> anyhow::Result<()> {
+        let mut socket = UnixStream::connect(&self.socket_path).await?;
+        socket.write_all(&[msg as u8]).await?;
+
+        let mut buf: [u8; 1] = [0];
+        socket.read_exact(&mut buf).await?;
+
+        self.handle_response(&buf)
+    }
+
+    fn blocking_send_message(&self, msg: Message) -> anyhow::Result<()> {
+        let mut socket = std::os::unix::net::UnixStream::connect(&self.socket_path)?;
+        std::io::Write::write_all(&mut socket, &[msg as u8])?;
+
+        let mut buf: [u8; 1] = [0];
+        std::io::Read::read_exact(&mut socket, &mut buf)?;
+
+        self.handle_response(&buf)
+    }
+
+    fn handle_response(&self, response_buf: &[u8]) -> anyhow::Result<()> {
+        match ResponseMessage::try_from(response_buf[0]) {
+            Ok(ResponseMessage::Success) => Ok(()),
+            Ok(ResponseMessage::UnknownMessage) => {
+                anyhow::bail!("unexpected error, server couldn't understand the message")
+            }
+            Ok(ResponseMessage::Failed) => {
+                anyhow::bail!("server error, please check server logs");
+            }
+            Err(()) => anyhow::bail!("unexpected error, unknown message received from server"),
         }
-
-        let mut to_save = Vec::new();
-
-        for window in windows {
-            let datetime = window.datetime.to_rfc3339();
-            let duration = window.duration.as_secs_f64();
-            to_save.push((datetime, &window.class, &window.title, duration));
-        }
-
-        let mut query =
-            String::from("INSERT INTO windows_log (datetime, class, title, duration) VALUES");
-
-        for (index, _) in to_save.iter().enumerate() {
-            let i = index * 4;
-            query += &format!("\n(?{}, ?{}, ?{}, ?{}),", i + 1, i + 2, i + 3, i + 4,);
-        }
-
-        // replace last `,` with `;`
-        let mut query = query.chars();
-        query.next_back();
-        let query = format!("{};", query.as_str());
-
-        let mut query = sqlx::query(&query);
-        for window in to_save {
-            query = query
-                .bind(window.0)
-                .bind(window.1)
-                .bind(window.2)
-                .bind(window.3)
-        }
-        query.execute(&self.pool).await?;
-
-        Ok(())
     }
-
-    fn get_database_url() -> anyhow::Result<String> {
-        let path = crate::get_xdg_dirs()?.place_data_file("apps.db")?;
-        let path_str = path.to_str().context("database path is not unicode")?;
-        Ok(format!("sqlite:{path_str}"))
-    }
-}
-
-impl FromRow<'_, SqliteRow> for crate::Window {
-    fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
-        let datetime = row.try_get("datetime")?;
-        let datetime = DateTime::parse_from_rfc3339(datetime).unwrap().naive_utc();
-        let datetime = Utc.from_utc_datetime(&datetime);
-        let class = row.try_get("class")?;
-        let title = row.try_get("title")?;
-        let duration = row.try_get("duration").map(Duration::from_secs_f64)?;
-        Ok(Self {
-            datetime,
-            title,
-            class,
-            duration,
-        })
-    }
-}
-
-impl FromRow<'_, SqliteRow> for crate::AppUsage {
-    fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
-        let app = row.try_get("class")?;
-        let duration = row.try_get("duration").map(Duration::from_secs_f64)?;
-        Ok(Self { app, duration })
-    }
-}
-
-impl FromRow<'_, SqliteRow> for crate::AppUsageDay {
-    fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
-        let day = row.try_get("date_local")?;
-        let date_local = NaiveDate::parse_from_str(day, "%Y-%m-%d").unwrap();
-        let duration = row.try_get("duration").map(Duration::from_secs_f64)?;
-        Ok(Self {
-            date_local,
-            duration,
-        })
-    }
-}
-
-fn to_utc(datetime: DateTime<Local>) -> DateTime<Utc> {
-    datetime.naive_utc().and_utc()
 }

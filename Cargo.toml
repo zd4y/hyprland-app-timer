@@ -3,20 +3,26 @@ name = "hyprland-app-timer"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "hyprland-app-timer-server"
+required-features = ["server"]
+
+[[bin]]
+name = "hyprland-app-timer-client"
+required-features = ["client"]
+
 [dependencies]
 anyhow = "1.0.66"
-chrono = "0.4.23"
-ipc-channel = "0.16.0"
 log = "0.4.17"
 xdg = "2.5.2"
-serde = { version = "1.0.152", features = ["derive"] }
-sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "sqlite"] }
-tokio = { version = "1.22.0", features = ["full"] }
 
+chrono = { version = "0.4.23", optional = true }
+tokio = { version = "1.22.0", optional = true }
 env_logger = { version = "0.10.0", optional = true }
-hyprland = { version = "0.4.0-alpha.2", optional = true }
-xcb = { version = "1.2.0", optional = true }
+hyprland = { version = "0.4.0-beta.2", optional = true }
+sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "sqlite"], optional = true }
 
 [features]
-default = ["server"]
-server = ["dep:hyprland", "dep:env_logger", "dep:xcb"]
+db = ["dep:sqlx", "dep:chrono", "tokio/rt"]
+client = []
+server = ["db", "client", "dep:hyprland", "dep:env_logger", "tokio/full"]
